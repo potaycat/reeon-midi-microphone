@@ -1,0 +1,9 @@
+pygame
+# https://vb-audio.com/Cable/
+pyaudio # portaudio
+numpy
+soxr
+
+torch
+torchaudio
+# deepfilternet
