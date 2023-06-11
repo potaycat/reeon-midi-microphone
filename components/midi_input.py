@@ -1,4 +1,5 @@
-from components.registry import Reg, Memo, knobs, pads
+from components.registry import Reg, Memo
+from config import knobs, pads
 
 
 def process_input(e):

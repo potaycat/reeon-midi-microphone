@@ -15,8 +15,7 @@ RATE = 44100
 
 
 class MyAudioEngine:
-    def __init__(self):
-        pa = pyaudio.PyAudio()
+    def __init__(self, pa, in_i=None, out_i=None):
         stream = pa.open(
             format=PA_FORMAT,
             channels=CHANNELS,
@@ -24,10 +23,13 @@ class MyAudioEngine:
             frames_per_buffer=CHUNK,
             input=True,
             output=True,
+            input_device_index=in_i,
+            output_device_index=out_i,
         )
         self.pa = pa
         self.stream = stream
         self.wfs = []
+        self.OUT_CHUNK = CHUNK * CHANNELS
 
     def process(self):
         # READ
@@ -35,19 +37,31 @@ class MyAudioEngine:
         chunk = self.stream.read(CHUNK, exception_on_overflow=False)
         chunk = np.frombuffer(chunk, dtype=DTYPE)
         ## Read soundboard wav
-        self.wfs += [(wave.open(wf, "rb"), gain) for wf, gain in Memo["soundpad_queue"]]
+        self.wfs += [
+            (
+                (wf := wave.open(f_name, "rb")),
+                wf.getsampwidth(),
+                wf.getnchannels(),
+                wf.getframerate(),
+                gain,
+            )
+            for f_name, gain in Memo["soundpad_queue"]
+        ]
         Memo["soundpad_queue"] = []
 
         # EDIT
         ## Microphone
         ### fourier moment
         fourier = np.fft.rfft(chunk)
-        fourier_len = fourier.shape[0]
         ### mic pitch
-        fourier = np.roll(fourier, s := int(Reg["mic_pitch_shift"]))
-        fourier[s if s < 0 else 0 : s if s > 0 else 0] = 0
+        if shift := int(Reg["mic_pitch_shift"]):
+            fourier = np.roll(fourier, shift)
+            if shift > 0:
+                fourier[:shift] = 0
+            else:
+                fourier[shift:] = 0
         ### mic bass boost + distort
-        freq_range = int(fourier_len / Reg["mic_lowpass_cutoff"])
+        freq_range = int((fourier_len := fourier.shape[0]) / Reg["mic_lowpass_cutoff"])
         fourier[0:freq_range] *= (multiplier := Reg["mic_lowpass_multi"])
         step = multiplier / freq_range
         i = freq_range
@@ -60,33 +74,28 @@ class MyAudioEngine:
         chunk = np.array(chunk * Reg["mic_gain"])
 
         ## Soundboard
-        ## read soundboard wav
-        wavs = []
-        for i, (wf, gain) in enumerate(self.wfs):
+        ## add soundboard wav
+        for i, (wf, _, ch, sr, gain) in enumerate(self.wfs):
             s_c = wf.readframes(CHUNK)
             if not s_c:
                 wf.close()
                 self.wfs.pop(i)
                 continue
             s_c = np.frombuffer(s_c, dtype=DTYPE)
-            if sc_len := s_c.shape[0] > CHUNK:
-                s_c = s_c[::2] + s_c[1::2]  # mono-ify
-            s_c = s_c * gain
-            wavs.append(s_c)
-        ## add soundboard wav
-        for wav in wavs:
-            wav = wav * Reg["soundpad_gain"]
-            # wav = soxr.resample(wav, wav.shape[0], CHUNK)
-            wav = np.pad(wav, (0, CHUNK - wav.shape[0]), "edge")
-            chunk += wav
+            if ch > CHANNELS:
+                s_c = s_c.astype(np.int32)
+                s_c = (s_c[::2] + s_c[1::2]) / 2
+            s_c = s_c * gain * Reg["soundpad_gain"]
+            s_c = np.pad(s_c, (0, self.OUT_CHUNK - s_c.shape[0]), "edge")
+            chunk += s_c
 
         ## Global
         ### pitch v2
         chunk = soxr.resample(chunk, CHUNK, int(CHUNK / Reg["global_pitch"]))
-        if to_pad := CHUNK - chunk.shape[0] > 0:
+        if to_pad := self.OUT_CHUNK - chunk.shape[0] > 0:
             chunk = np.pad(chunk, (0, to_pad), "symmetric")
         else:
-            chunk = chunk[:CHUNK]
+            chunk = chunk[: self.OUT_CHUNK]
 
         # WRITE
         chunk = chunk.astype(DTYPE)

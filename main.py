@@ -1,34 +1,52 @@
+import os
+
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
+
 from components.audio_engine import MyAudioEngine
 from components.midi_input import process_input
 import pygame
 import pygame.midi
 import time
-
-MIDI_DEVICE = 0
+import pyaudio
 
 
 def main():
-    my_audio_engine = MyAudioEngine()
+    print("\n** REEON MIDI CONTROLLER FOR MICROPHONE **")
     pygame.init()
     pygame.fastevent.init()
     pygame.midi.init()
+    pa = pyaudio.PyAudio()
 
+    print("\nAudio Devices")
+    for i in range(pa.get_host_api_info_by_index(0).get("deviceCount")):
+        device = pa.get_device_info_by_host_api_device_index(0, i)
+        print(
+            f"{i}. {device.get('name')} \t| IN: {device.get('maxInputChannels')} OUT: {device.get('maxOutputChannels')}"
+        )
+    print("\nMIDI Devices")
     for i in range(pygame.midi.get_count()):
-        device_info = pygame.midi.get_device_info(i)
-        print(device_info)
+        interf, name, inp, outp, opened = pygame.midi.get_device_info(i)
+        if inp:
+            print(f"{i}. {name.decode('utf-8')}")
+    print("\nSelect your devices.")
+    in_au = int(input("  Capture audio from: "))
+    out_au = int(input("  Output audio to: "))
+    in_midi = int(input("  Get MIDI input from: "))
 
-    midi_inp = pygame.midi.Input(MIDI_DEVICE)
+    my_audio_engine = MyAudioEngine(pa, in_au, out_au)
+    in_midi = pygame.midi.Input(in_midi)
 
+    print("\n* RUNNING")
     while 1:
         events = pygame.fastevent.get()
         for e in events:
             if e.type in [pygame.midi.MIDIIN]:
                 process_input(e)
 
-        if midi_inp.poll():
+        if in_midi.poll():
             midi_evs = pygame.midi.midis2events(
-                midi_inp.read(10),
-                midi_inp.device_id,
+                in_midi.read(10),
+                in_midi.device_id,
             )
             for ev in midi_evs:
                 pygame.fastevent.post(ev)
