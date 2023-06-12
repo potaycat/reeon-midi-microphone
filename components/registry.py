@@ -1,6 +1,5 @@
 Reg = {
-    "mic_gain": 0.5,
-    "mic_pitch_shift": 0.0,
+    "mic_gain": 1.0,
     # mic_reverb =
     "mic_lowpass_multi": 1.0,
     "mic_lowpass_cutoff": 1.0,

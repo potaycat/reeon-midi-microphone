@@ -6,7 +6,6 @@ from components.audio_engine import MyAudioEngine
 from components.midi_input import process_input
 import pygame
 import pygame.midi
-import time
 import pyaudio
 
 
@@ -52,7 +51,6 @@ def main():
                 pygame.fastevent.post(ev)
 
         my_audio_engine.process()
-        time.sleep(0.01)
 
     pygame.midi.quit()
 

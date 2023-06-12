@@ -1,7 +1,7 @@
 knobs = {
     3: {
         "name": "mic_gain",
-        "default": 0.5,
+        "default": 1.0,
         "min": 0.0,
         "max": 1.5,
     },
@@ -22,7 +22,7 @@ knobs = {
         "name": "mic_lowpass_cutoff",
         "default": 1.0,
         "min": 1.0,
-        "max": 5.0,
+        "max": 300.0,
         "invert": True,
     },
     14: {
@@ -35,7 +35,7 @@ knobs = {
         "name": "global_pitch",
         "default": 1.0,
         "min": 0.8,
-        "max": 1.308,
+        "max": 1.216,
     },
 }
 
